@@ -1,4 +1,5 @@
 import { registerRootComponent } from 'expo';
+import './src/screens/HomeScreen.js';
 
 import App from './App';
 
