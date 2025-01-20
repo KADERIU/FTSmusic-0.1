@@ -7,20 +7,21 @@ import {
   View,
   TouchableOpacity,
   Image,
+  Keyboard,
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
 
 export default function SearchScreen() {
-  const [query, setQuery] = useState(""); // La requête de recherche
-  const [suggestions, setSuggestions] = useState([]); // Les résultats de suggestions
+  const [query, setQuery] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+  const [isFocused, setIsFocused] = useState(false); // Nouvel état pour gérer la mise au point
 
-  // Fonction pour récupérer les suggestions de vidéos
   const fetchSuggestions = async (text) => {
     setQuery(text);
 
     if (text.trim().length === 0) {
-      setSuggestions([]); // Vider les suggestions si la saisie est vide
+      setSuggestions([]);
       return;
     }
 
@@ -37,12 +38,11 @@ export default function SearchScreen() {
       const response = await axios.get(searchUrl, { headers });
       const htmlContent = response.data;
 
-      // Extraire le JSON contenant les données vidéo
       const videoDataMatch = htmlContent.match(
         /var ytInitialData = (\{.*?\});/
       );
       if (!videoDataMatch) {
-        setSuggestions([]); // Aucune suggestion si le JSON est introuvable
+        setSuggestions([]);
         return;
       }
 
@@ -75,11 +75,10 @@ export default function SearchScreen() {
     }
   };
 
-  // Fonction pour rendre chaque suggestion
   const renderSuggestion = ({ item }) => (
     <TouchableOpacity
       style={styles.suggestionItem}
-      onPress={() => console.log(`Video URL: ${item.url}`)} // Modifier selon vos besoins
+      onPress={() => console.log(`Video URL: ${item.url}`)}
     >
       <Text style={styles.suggestionText}>{item.title}</Text>
     </TouchableOpacity>
@@ -87,21 +86,24 @@ export default function SearchScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Logo fixe en haut */}
-      <View style={styles.logoContainer}>
+      <View style={[styles.logoContainer, isFocused && styles.logoContainerSmall]}>
         <Image
-          source={require("../../assets/FTSmusic_logo.png")} // Chemin vers votre image de logo
-          style={styles.logoImage}
+          source={require("../../assets/FTSmusic_logo.png")}
+          style={[styles.logoImage, isFocused && styles.logoImageSmall]}
         />
       </View>
 
-      {/* Barre de recherche */}
       <View style={styles.searchBar}>
         <TextInput
           style={styles.searchInput}
           placeholder="Rechercher..."
           value={query}
           onChangeText={fetchSuggestions}
+          onFocus={() => setIsFocused(true)} // Réduit le logo et ajuste la barre de recherche
+          onBlur={() => {
+            setIsFocused(false); // Rétablit les styles par défaut
+            Keyboard.dismiss();
+          }}
           autoCorrect={false}
         />
         <TouchableOpacity style={styles.searchButton}>
@@ -109,10 +111,9 @@ export default function SearchScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Liste des suggestions */}
       <FlatList
-        data={suggestions.slice(0, 5)} // Limite à 5 suggestions visibles
-        keyExtractor={(item) => item.id || item} // `item.id` pour suggestions
+        data={suggestions.slice(0, 5)}
+        keyExtractor={(item) => item.id || item}
         renderItem={renderSuggestion}
         style={styles.suggestionList}
         contentContainerStyle={styles.suggestionListContainer}
@@ -133,9 +134,17 @@ const styles = StyleSheet.create({
     marginTop: 50,
     marginBottom: 20,
   },
+  logoContainerSmall: {
+    marginTop: 50,
+    marginBottom: 10,
+  },
   logoImage: {
     width: 100,
     height: 100,
+  },
+  logoImageSmall: {
+    width: 60,
+    height: 60,
   },
   searchBar: {
     flexDirection: "row",

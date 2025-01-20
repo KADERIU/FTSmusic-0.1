@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
-    padding: 10,
+    padding: 55,
   },
   sectionTitle: {
     fontSize: 18,
@@ -48,9 +48,9 @@ const styles = StyleSheet.create({
   },
   playlistItem: {
     backgroundColor: "#282828",
-    padding: 30,
-    marginBottom: 15,
-    borderRadius: 10,
+    padding: 20,
+    marginBottom: 20,
+    borderRadius: 20,
   },
   playlistText: {
     color: "white",
@@ -58,8 +58,8 @@ const styles = StyleSheet.create({
   },
   likedItem: {
     backgroundColor: "#383838",
-    padding: 15,
+    padding: 30,
     marginBottom: 10,
-    borderRadius: 8,
+    borderRadius: 16,
   },
 });

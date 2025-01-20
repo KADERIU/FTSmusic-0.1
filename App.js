@@ -1,38 +1,37 @@
 import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { createStackNavigator } from "@react-navigation/stack"; // Ajouter un Stack Navigator
+import { createStackNavigator } from "@react-navigation/stack";
 import { MaterialIcons } from "@expo/vector-icons";
 
 import HomeScreen from "./src/screens/HomeScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import LibraryScreen from "./src/screens/LibraryScreen";
-import AlbumScreen from "./src/screens/AlbumScreen"; // Importer AlbumScreen
+import AlbumScreen from "./src/screens/AlbumScreen";
+import { MusicPlayerProvider } from "./src/context/MusicPlayerContext";
 
 const Tab = createBottomTabNavigator();
-const Stack = createStackNavigator(); // Créer un Stack Navigator
+const Stack = createStackNavigator();
 
-// Définir le BottomTabNavigator
 function BottomTabNavigator() {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-
-          if (route.name === "Accueil") {
-            iconName = focused ? "home" : "home";
-          } else if (route.name === "Rechercher") {
-            iconName = focused ? "search" : "search";
-          } else if (route.name === "Bibliothèque") {
-            iconName = focused ? "library-music" : "library-music";
-          }
+          if (route.name === "Accueil") iconName = "home";
+          else if (route.name === "Rechercher") iconName = "search";
+          else if (route.name === "Bibliothèque") iconName = "library-music";
 
           return <MaterialIcons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: "#1DB954",
         tabBarInactiveTintColor: "gray",
-        headerShown: false, // Cacher l'en-tête par défaut
+        headerShown: false,
+        tabBarStyle: {
+          backgroundColor: "#121212",
+          borderTopWidth: 0,
+        },
       })}
     >
       <Tab.Screen name="Accueil" component={HomeScreen} />
@@ -42,29 +41,27 @@ function BottomTabNavigator() {
   );
 }
 
-// Configurer le Stack Navigator principal
 export default function App() {
   return (
-    <NavigationContainer>
-      <Stack.Navigator>
-        {/* Le BottomTabNavigator est le premier écran (principal) */}
-        <Stack.Screen
-          name="Tabs"
-          component={BottomTabNavigator}
-          options={{ headerShown: false }} // Cacher l'en-tête du TabNavigator
-        />
-
-        {/* Ajouter l'écran AlbumScreen dans le Stack */}
-        <Stack.Screen
-          name="AlbumScreen"
-          component={AlbumScreen}
-          options={{
-            title: "Détails de l'Album", // Titre de l'en-tête
-            headerStyle: { backgroundColor: "#1DB954" },
-            headerTintColor: "#fff",
-          }}
-        />
-      </Stack.Navigator>
-    </NavigationContainer>
+    <MusicPlayerProvider>
+      <NavigationContainer>
+        <Stack.Navigator>
+          <Stack.Screen
+            name="Tabs"
+            component={BottomTabNavigator}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="AlbumScreen"
+            component={AlbumScreen}
+            options={{
+              title: "Détails de l'Album",
+              headerStyle: { backgroundColor: "#1DB954" },
+              headerTintColor: "#fff",
+            }}
+          />
+        </Stack.Navigator>
+      </NavigationContainer>
+    </MusicPlayerProvider>
   );
 }

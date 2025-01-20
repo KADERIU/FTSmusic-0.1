@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
@@ -7,25 +7,27 @@ import {
   Image,
   ActivityIndicator,
   TouchableOpacity,
-  Alert,
 } from "react-native";
-import { Audio } from "expo-av"; // Librairie pour le lecteur audio
-import { getAlbum, getData, filter } from "@hydralerne/youtube-api";
+import { getAlbum } from "@hydralerne/youtube-api";
+import { useMusicPlayer } from "../context/MusicPlayerContext"; // Importer le contexte du lecteur
 
 export default function AlbumScreen({ route }) {
   const { albumID } = route.params; // ID de l'album passé depuis HomeScreen
   const [albumDetails, setAlbumDetails] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isPlaying, setIsPlaying] = useState(false); // État pour vérifier si la musique joue
-  const [currentTrack, setCurrentTrack] = useState(null); // Stocker la piste actuelle
-  const audioPlayer = useRef(new Audio.Sound()); // Référence au lecteur audio
+  const { playTrack } = useMusicPlayer(); // Accéder à la fonction `playTrack` du contexte
 
   // Charger les détails de l'album
   useEffect(() => {
     const fetchAlbumDetails = async () => {
       try {
-        const details = await getAlbum(albumID); // Appeler l'API pour récupérer l'album
-        setAlbumDetails(details);
+        const details = await getAlbum(albumID);
+        console.log("Détails de l'album :", details); // Log pour déboguer
+        if (details && details.tracks) {
+          setAlbumDetails(details);
+        } else {
+          console.error("Données d'album invalides :", details);
+        }
       } catch (error) {
         console.error("Erreur lors de la récupération de l'album :", error);
       } finally {
@@ -35,49 +37,6 @@ export default function AlbumScreen({ route }) {
 
     fetchAlbumDetails();
   }, [albumID]);
-
-  // Fonction pour jouer une chanson
-  const playTrack = async (trackId, trackTitle) => {
-    try {
-      // Récupérer les formats audio avec getData
-      const formats = await getData(trackId);
-      const bestAudio = filter(formats, "bestaudio", {
-        minBitrate: 128000,
-        codec: "mp4a",
-      });
-
-      // Vérifier si une URL audio est disponible
-      if (!bestAudio || !bestAudio.url) {
-        Alert.alert("Erreur", "Impossible de récupérer l'audio pour cette chanson.");
-        return;
-      }
-
-      // Arrêter le lecteur audio s'il joue une autre chanson
-      if (audioPlayer.current) {
-        await audioPlayer.current.unloadAsync();
-      }
-
-      // Charger la nouvelle chanson et jouer
-      await audioPlayer.current.loadAsync({ uri: bestAudio.url }, {}, true);
-      await audioPlayer.current.playAsync();
-
-      setCurrentTrack(trackTitle); // Mettre à jour la piste en cours
-      setIsPlaying(true); // Mettre à jour l'état de lecture
-    } catch (error) {
-      console.error("Erreur lors de la lecture du morceau :", error);
-      Alert.alert("Erreur", "Impossible de lire le morceau.");
-    }
-  };
-
-  // Fonction pour mettre en pause la musique
-  const pauseTrack = async () => {
-    try {
-      await audioPlayer.current.pauseAsync();
-      setIsPlaying(false); // Mettre à jour l'état de lecture
-    } catch (error) {
-      console.error("Erreur lors de la pause :", error);
-    }
-  };
 
   if (loading) {
     return (
@@ -97,53 +56,47 @@ export default function AlbumScreen({ route }) {
 
   return (
     <View style={styles.container}>
-      {/* Image principale de l'album */}
+      {/* Image de l'album avec bordure bleue */}
       <View style={styles.albumImageContainer}>
         <Image
-          source={{ uri: albumDetails.poster }}
+          source={{ uri: albumDetails.poster || "https://via.placeholder.com/250" }}
           style={styles.albumPoster}
         />
       </View>
 
       {/* Infos sur l'album */}
       <View style={styles.albumInfoContainer}>
-        <Text style={styles.albumTitle}>{albumDetails.name}</Text>
-        <Text style={styles.albumArtist}>Par {albumDetails.artist}</Text>
+        <Text style={styles.albumTitle}>{albumDetails.name || "Titre inconnu"}</Text>
+        <Text style={styles.albumArtist}>
+          {albumDetails.artist || "Artiste inconnu"}
+        </Text>
         <Text style={styles.albumInfo}>
-          {albumDetails.tracks_count} • {albumDetails.tracks_time}
+          {albumDetails.tracks_count || 0} • {albumDetails.tracks_time || "Durée inconnue"}
         </Text>
       </View>
 
       {/* Liste des morceaux */}
       <FlatList
         data={albumDetails.tracks}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item, index) => item.id || `key-${index}`}
         renderItem={({ item }) => (
           <TouchableOpacity onPress={() => playTrack(item.id, item.title)}>
             <View style={styles.track}>
-              <Image source={{ uri: item.poster }} style={styles.trackImage} />
+              <Image
+                source={{ uri: item.poster || "https://via.placeholder.com/80" }}
+                style={styles.trackImage}
+              />
               <View style={styles.trackDetails}>
-                <Text style={styles.trackTitle}>{item.title}</Text>
-                <Text style={styles.trackPlays}>{item.plays_count}</Text>
+                <Text style={styles.trackTitle}>{item.title || "Titre inconnu"}</Text>
+                <Text style={styles.trackPlays}>{item.plays_count || "0 écoutes"}</Text>
               </View>
             </View>
           </TouchableOpacity>
         )}
+        ListEmptyComponent={
+          <Text style={styles.text}>Aucun morceau disponible pour cet album.</Text>
+        }
       />
-
-      {/* Lecteur audio minimal */}
-      {currentTrack && (
-        <View style={styles.audioPlayer}>
-          <Text style={styles.currentTrack}>{currentTrack}</Text>
-          <TouchableOpacity
-            onPress={isPlaying ? pauseTrack : () => playTrack(currentTrack.id, currentTrack)}
-          >
-            <Text style={styles.playPauseButton}>
-              {isPlaying ? "⏸️ Pause" : "▶️ Play"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-      )}
     </View>
   );
 }
@@ -152,6 +105,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
+  },
+  text: {
+    fontSize: 16,
+    color: "white",
   },
   albumImageContainer: {
     marginTop: 20,
@@ -164,7 +121,7 @@ const styles = StyleSheet.create({
     height: 250,
     borderRadius: 20,
     borderWidth: 5,
-    borderColor: "white",
+    borderColor: "white", // Bordure bleue
   },
   albumInfoContainer: {
     alignItems: "center",
@@ -174,12 +131,10 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: "bold",
     color: "white",
-    marginBottom: 5,
   },
   albumArtist: {
     fontSize: 18,
     color: "gray",
-    marginBottom: 5,
   },
   albumInfo: {
     fontSize: 16,
@@ -195,7 +150,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 5,
-    marginRight: 15,
+    marginRight: 10,
   },
   trackDetails: {
     flex: 1,
@@ -207,26 +162,5 @@ const styles = StyleSheet.create({
   trackPlays: {
     fontSize: 14,
     color: "gray",
-  },
-  audioPlayer: {
-    position: "absolute",
-    bottom: 20,
-    left: 20,
-    right: 20,
-    backgroundColor: "#1E1E1E",
-    padding: 10,
-    borderRadius: 10,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  currentTrack: {
-    color: "white",
-    fontSize: 16,
-  },
-  playPauseButton: {
-    color: "#1DB954",
-    fontSize: 18,
-    fontWeight: "bold",
   },
 });
