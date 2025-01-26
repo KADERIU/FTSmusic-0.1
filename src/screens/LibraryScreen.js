@@ -1,9 +1,25 @@
+// =========================== 
+// screens/LibraryScreen.js
+// ===========================
 import React from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { ScrollView, StyleSheet, Text, View, Image, TouchableOpacity } from "react-native";
+import { useMusicPlayer } from "../../musicPlayers/MusicPlayerContext";
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function LibraryScreen({ route }) {
-  // Récupérer les titres likés passés via la navigation
   const likedTitles = route.params?.likedTitles || [];
+
+  // --- Utilisation de useFocusEffect pour gérer bottomBarHeight ---
+  const { setBottomBarHeight } = useMusicPlayer();
+  useFocusEffect(
+    React.useCallback(() => {
+      setBottomBarHeight(24); // Il y a un menu
+
+      return () => {
+        // Optionnel : Remettre à une valeur par défaut si nécessaire
+      };
+    }, [setBottomBarHeight])
+  );
 
   const playlists = [
     { id: "1", title: "Titres likés" },
@@ -26,7 +42,15 @@ export default function LibraryScreen({ route }) {
           <Text style={styles.sectionTitle}>Titres likés</Text>
           {likedTitles.map((title) => (
             <View key={title.id} style={styles.likedItem}>
-              <Text style={styles.playlistText}>{title.title}</Text>
+              {/* Ajout de l'image et des informations supplémentaires */}
+              <Image source={{ uri: title.poster }} style={styles.likedImage} />
+              <View style={styles.likedInfoContainer}>
+                <Text style={styles.likedTitle}>{title.title}</Text>
+                <Text style={styles.likedChannel}>{title.channel}</Text>
+              </View>
+              <TouchableOpacity style={styles.likeButton}>
+                <Text style={styles.likeButtonText}>💔</Text>
+              </TouchableOpacity>
             </View>
           ))}
         </>
@@ -58,8 +82,37 @@ const styles = StyleSheet.create({
   },
   likedItem: {
     backgroundColor: "#383838",
-    padding: 30,
+    padding: 20,
     marginBottom: 10,
     borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  likedImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 10,
+  },
+  likedInfoContainer: {
+    flex: 1,
+  },
+  likedTitle: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  likedChannel: {
+    color: "#bbb",
+    fontSize: 14,
+  },
+  likeButton: {
+    padding: 10,
+    backgroundColor: "#ff4444",
+    borderRadius: 8,
+  },
+  likeButtonText: {
+    color: "white",
+    fontSize: 14,
   },
 });

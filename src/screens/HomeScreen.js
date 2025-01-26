@@ -1,3 +1,6 @@
+// ===========================
+// screens/HomeScreen.js
+// ===========================
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -10,12 +13,26 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { getHome } from "@hydralerne/youtube-api";
+import { useMusicPlayer } from "../../musicPlayers/MusicPlayerContext";
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function HomeScreen({ navigation }) {
   const [homeData, setHomeData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [likedTitles, setLikedTitles] = useState([]);
+
+  // --- Utilisation de useFocusEffect pour gérer bottomBarHeight ---
+  const { setBottomBarHeight } = useMusicPlayer();
+  useFocusEffect(
+    React.useCallback(() => {
+      setBottomBarHeight(24); // Il y a un menu
+
+      return () => {
+        // Optionnel : Remettre à une valeur par défaut si nécessaire
+      };
+    }, [setBottomBarHeight])
+  );
 
   // Fonction pour récupérer les données
   const fetchData = async () => {

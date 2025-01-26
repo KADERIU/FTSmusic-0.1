@@ -1,3 +1,6 @@
+// ===========================
+// screens/SearchScreen.js
+// ===========================
 import React, { useState } from "react";
 import {
   StyleSheet,
@@ -11,36 +14,61 @@ import {
 } from "react-native";
 import { MaterialIcons } from "@expo/vector-icons";
 import axios from "axios";
+import { useMusicPlayer } from "../../musicPlayers/MusicPlayerContext";
+import { useFocusEffect } from '@react-navigation/native';
 
 export default function SearchScreen() {
+  // Le texte de la recherche
   const [query, setQuery] = useState("");
+  // La liste de suggestions (videos)
   const [suggestions, setSuggestions] = useState([]);
-  const [isFocused, setIsFocused] = useState(false); // Nouvel état pour gérer la mise au point
+  // isFocused pour styliser le logo ou autre
+  const [isFocused, setIsFocused] = useState(false);
 
+  // On récupère la fonction playTrack et updateTracksList
+  const { isBusy, playTrack, updateTracksList, setBottomBarHeight } = useMusicPlayer();
+
+  // -- Gestion dynamique de bottomBarHeight via useFocusEffect --
+  useFocusEffect(
+    React.useCallback(() => {
+      setBottomBarHeight(24); // Il y a un menu
+
+      return () => {
+        // Optionnel : Remettre à une valeur par défaut si nécessaire
+      };
+    }, [setBottomBarHeight])
+  );
+
+  // On veut jusqu'à 30 résultats
+  const MAX_RESULTS = 30;
+
+  // fetchSuggestions : requête YouTube
   const fetchSuggestions = async (text) => {
     setQuery(text);
 
+    // Si c'est vide, on efface
     if (text.trim().length === 0) {
       setSuggestions([]);
       return;
     }
 
     try {
+      // URL de recherche
       const searchUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(
         text
       )}`;
-
+      // Headers
       const headers = {
         "User-Agent":
           "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36",
       };
 
+      // Requête
       const response = await axios.get(searchUrl, { headers });
       const htmlContent = response.data;
 
-      const videoDataMatch = htmlContent.match(
-        /var ytInitialData = (\{.*?\});/
-      );
+      // On parse le JSON (ytInitialData)
+      const videoDataMatch = htmlContent.match(/var ytInitialData = (\{.*?\});/);
       if (!videoDataMatch) {
         setSuggestions([]);
         return;
@@ -57,100 +85,137 @@ export default function SearchScreen() {
         if (items) {
           items.forEach((item) => {
             if (item.videoRenderer) {
+              // On récupère l'id, le titre
               const videoId = item.videoRenderer.videoId;
               const title =
-                item.videoRenderer.title.runs[0]?.text || "Titre non disponible";
-              const url = `https://www.youtube.com/watch?v=${videoId}`;
+                item.videoRenderer.title.runs[0]?.text ||
+                "Titre non disponible";
 
-              videoResults.push({ id: videoId, title, url });
+              // On prend la plus large miniature => meilleure qualité
+              const thumbArray = item.videoRenderer.thumbnail?.thumbnails || [];
+              const bigThumb = thumbArray.reduce((acc, el) => {
+                return el.width > (acc.width || 0) ? el : acc;
+              }, {});
+              const thumbnailUrl = bigThumb.url || "";
+
+              videoResults.push({
+                id: videoId,
+                title,
+                thumbnail: thumbnailUrl,
+              });
             }
           });
         }
       });
 
-      setSuggestions(videoResults);
+      // On limite à MAX_RESULTS
+      const resultsLimited = videoResults.slice(0, MAX_RESULTS);
+      setSuggestions(resultsLimited);
     } catch (error) {
-      console.error("Erreur lors de la récupération des suggestions :", error);
+      console.error("Erreur fetchSuggestions:", error);
       setSuggestions([]);
     }
   };
 
+  // Quand on clique sur le bouton vert
+  const handlePressSearchButton = () => {
+    // On met en queue toutes les suggestions
+    updateTracksList(
+      suggestions.map((v) => ({
+        id: v.id,
+        title: v.title,
+        poster: v.thumbnail,
+      }))
+    );
+    // On ferme le clavier
+    Keyboard.dismiss();
+  };
+
+  // Rendu d'un item
   const renderSuggestion = ({ item }) => (
     <TouchableOpacity
-      style={styles.suggestionItem}
-      onPress={() => console.log(`Video URL: ${item.url}`)}
+      style={styles.itemContainer}
+      onPress={() => {
+        if (isBusy) return;
+        // Lecture directe
+        playTrack(item.id, item.title, item.thumbnail);
+        Keyboard.dismiss();
+      }}
     >
-      <Text style={styles.suggestionText}>{item.title}</Text>
+      <Image source={{ uri: item.thumbnail }} style={styles.thumbnail} />
+      <Text style={styles.itemTitle} numberOfLines={1}>
+        {item.title}
+      </Text>
     </TouchableOpacity>
   );
 
   return (
     <View style={styles.container}>
+      {/* Logo au dessus */}
       <View style={[styles.logoContainer, isFocused && styles.logoContainerSmall]}>
         <Image
-          source={require("../../assets/FTSmusic_logo.png")}
-          style={[styles.logoImage, isFocused && styles.logoImageSmall]}
+          source={require("../../assets/FTSmusic_logo.png")} // Remplace par ton logo
+          style={styles.logoImage}
+          resizeMode="contain"
         />
       </View>
 
+      {/* Barre de recherche */}
       <View style={styles.searchBar}>
         <TextInput
           style={styles.searchInput}
           placeholder="Rechercher..."
+          placeholderTextColor="#888"
           value={query}
           onChangeText={fetchSuggestions}
-          onFocus={() => setIsFocused(true)} // Réduit le logo et ajuste la barre de recherche
+          onFocus={() => setIsFocused(true)}
           onBlur={() => {
-            setIsFocused(false); // Rétablit les styles par défaut
+            setIsFocused(false);
             Keyboard.dismiss();
           }}
           autoCorrect={false}
         />
-        <TouchableOpacity style={styles.searchButton}>
+        <TouchableOpacity style={styles.searchButton} onPress={handlePressSearchButton}>
           <MaterialIcons name="search" size={24} color="white" />
         </TouchableOpacity>
       </View>
 
+      {/* Liste des résultats */}
       <FlatList
-        data={suggestions.slice(0, 5)}
-        keyExtractor={(item) => item.id || item}
+        data={suggestions}
+        keyExtractor={(item) => item.id}
         renderItem={renderSuggestion}
-        style={styles.suggestionList}
-        contentContainerStyle={styles.suggestionListContainer}
+        style={{ width: "100%" }}
+        contentContainerStyle={{ paddingBottom: 20 }}
       />
     </View>
   );
 }
 
+// Styles basiques
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#121212",
     alignItems: "center",
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
   },
   logoContainer: {
-    alignItems: "center",
-    marginTop: 50,
+    marginTop: 40,
     marginBottom: 20,
   },
   logoContainerSmall: {
-    marginTop: 50,
+    marginTop: 30,
     marginBottom: 10,
   },
   logoImage: {
-    width: 100,
-    height: 100,
-  },
-  logoImageSmall: {
-    width: 60,
+    width: 120,
     height: 60,
   },
   searchBar: {
     flexDirection: "row",
-    alignItems: "center",
     width: "100%",
-    marginBottom: 20,
+    marginBottom: 15,
   },
   searchInput: {
     flex: 1,
@@ -162,24 +227,30 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   searchButton: {
-    marginLeft: 10,
+    marginLeft: 8,
     backgroundColor: "#1DB954",
     borderRadius: 10,
-    height: 50,
     width: 50,
+    height: 50,
     justifyContent: "center",
     alignItems: "center",
   },
-  suggestionList: {
-    width: "100%",
-  },
-  suggestionItem: {
-    padding: 15,
+  itemContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 10,
     borderBottomColor: "#333",
     borderBottomWidth: 1,
   },
-  suggestionText: {
-    color: "white",
+  thumbnail: {
+    width: 60,
+    height: 60,
+    marginRight: 10,
+    borderRadius: 4,
+  },
+  itemTitle: {
+    color: "#fff",
     fontSize: 16,
+    flex: 1,
   },
 });

@@ -1,0 +1,54 @@
+import youtubeAPI from './youtubeAPI.js';
+
+const getBestMedia = (formats, type) => {
+    return formats
+        .filter(f => f.mimeType.startsWith(type))
+        .sort((a, b) => {
+            if (type === 'video') {
+                const aRes = (a.width || 0) * (a.height || 0);
+                const bRes = (b.width || 0) * (b.height || 0);
+                return bRes - aRes || b.bitrate - a.bitrate;
+            }
+            return b.bitrate - a.bitrate;
+        })[0];
+};
+
+(async (videoId = 'kJQP7kiw5Fk') => {
+    try {
+        const rawData = await youtubeAPI.player.getData(videoId, true, 'android');
+        const formats = youtubeAPI.player.parseFormats(rawData);
+
+        // Récupération des meilleurs médias
+        const best = {
+            video: getBestMedia(formats, 'video/'),
+            audio: getBestMedia(formats, 'audio/'),
+            thumbnail: rawData.videoDetails?.thumbnail?.thumbnails
+                .sort((a, b) => b.width - a.width)[0],
+            details: {
+                title: rawData.videoDetails?.title,
+                channel: rawData.videoDetails?.author,
+                length: rawData.videoDetails?.lengthSeconds,
+                views: rawData.videoDetails?.viewCount
+            }
+        };
+
+        // Affichage structuré
+        console.log('🎦 Meilleure vidéo:');
+        console.log(`URL: ${best.video.url}\nRésolution: ${best.video.qualityLabel}`);
+
+        console.log('\n🔊 Meilleur audio:');
+        console.log(`URL: ${best.audio.url}\nCodec: ${best.audio.mimeType.split(';')[0]}`);
+
+        console.log('\n📸 Miniature HD:');
+        console.log(`URL: ${best.thumbnail.url}\nDimensions: ${best.thumbnail.width}x${best.thumbnail.height}`);
+
+        console.log('\n📊 Métadonnées:');
+        console.log(`Titre: ${best.details.title}`);
+        console.log(`Chaîne: ${best.details.channel}`);
+        console.log(`Durée: ${Math.floor(best.details.length/60)}m${best.details.length%60}s`);
+        console.log(`Vues: ${Number(best.details.views).toLocaleString()}`);
+
+    } catch (error) {
+        console.error('Erreur:', error.message);
+    }
+})();
