@@ -1,0 +1,172 @@
+// android/app/build.gradle
+
+// -----------------------------------------
+// 1) Plugins Gradle
+// -----------------------------------------
+apply plugin: "com.android.application"
+apply plugin: "org.jetbrains.kotlin.android"
+apply plugin: "com.facebook.react"
+
+// -----------------------------------------
+// 2) Variables internes (pas besoin d'y toucher)
+// -----------------------------------------
+def projectRoot = rootDir.getAbsoluteFile().getParentFile().getAbsolutePath()
+
+// -----------------------------------------
+// 3) Configuration React Native / Expo
+// -----------------------------------------
+react {
+    // Détermine le fichier d'entrée
+    entryFile = file([
+        "node",
+        "-e",
+        "require('expo/scripts/resolveAppEntry')",
+        projectRoot,
+        "android",
+        "absolute"
+    ].execute(null, rootDir).text.trim())
+
+    // Détermine le chemin de react-native
+    reactNativeDir = new File([
+        "node",
+        "--print",
+        "require.resolve('react-native/package.json')"
+    ].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+
+    // Détermine la commande Hermes
+    hermesCommand = new File([
+        "node",
+        "--print",
+        "require.resolve('react-native/package.json')"
+    ].execute(null, rootDir).text.trim()).getParentFile().getAbsolutePath() + "/sdks/hermesc/%OS-BIN%/hermesc"
+
+    // Détermine le chemin pour codegen
+    codegenDir = new File([
+        "node",
+        "--print",
+        "require.resolve('@react-native/codegen/package.json', { paths: [require.resolve('react-native/package.json')] })"
+    ].execute(null, rootDir).text.trim()).getParentFile().getAbsoluteFile()
+
+    // Utilise la CLI d’Expo pour le bundle
+    cliFile = new File([
+        "node",
+        "--print",
+        "require.resolve('@expo/cli', { paths: [require.resolve('expo/package.json')] })"
+    ].execute(null, rootDir).text.trim())
+    bundleCommand = "export:embed"
+
+    // Auto-link des bibliothèques
+    autolinkLibrariesWithApp()
+}
+
+// -----------------------------------------
+// 4) Configuration Android
+// -----------------------------------------
+android {
+    // IMPORTANT : Ne mets pas .positive() ici !
+    // On récupère la version du NDK depuis le top-level build.gradle
+    ndkVersion rootProject.ext.ndkVersion
+
+    buildToolsVersion rootProject.ext.buildToolsVersion
+    compileSdk rootProject.ext.compileSdkVersion
+
+    namespace "com.ftsmusic"  // Ajuste selon ton application
+
+    defaultConfig {
+        applicationId "com.ftsmusic"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+
+        versionCode 1
+        versionName "1.0"
+    }
+
+    signingConfigs {
+        debug {
+            storeFile file('debug.keystore')
+            storePassword 'android'
+            keyAlias 'androiddebugkey'
+            keyPassword 'android'
+        }
+    }
+
+    buildTypes {
+        debug {
+            signingConfig signingConfigs.debug
+        }
+        release {
+            // En production, configure ta propre keystore
+            signingConfig signingConfigs.debug
+
+            // Lis ces valeurs depuis gradle.properties si tu veux
+            shrinkResources (findProperty('android.enableShrinkResourcesInReleaseBuilds')?.toBoolean() ?: false)
+            minifyEnabled (findProperty('android.enableProguardInReleaseBuilds')?.toBoolean() ?: false)
+
+            proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
+
+            crunchPngs (findProperty('android.enablePngCrunchInReleaseBuilds')?.toBoolean() ?: true)
+        }
+    }
+
+    // Packaging des librairies JNI
+    packagingOptions {
+        jniLibs {
+            useLegacyPackaging (findProperty('expo.useLegacyPackaging')?.toBoolean() ?: false)
+        }
+    }
+
+    // Évite les conflits de fichiers inutiles
+    androidResources {
+        ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:!CVS:!thumbs.db:!picasa.ini:!*~'
+    }
+}
+
+// -----------------------------------------
+// 5) Personnalisation du packaging
+// -----------------------------------------
+["pickFirsts", "excludes", "merges", "doNotStrip"].each { prop ->
+    def options = (findProperty("android.packagingOptions.$prop") ?: "").split(",")
+    for (i in 0..<options.size()) options[i] = options[i].trim()
+    options -= ""
+    if (options.length > 0) {
+        println "android.packagingOptions.$prop += $options ($options.length)"
+        options.each {
+            android.packagingOptions[prop] += it
+        }
+    }
+}
+
+// -----------------------------------------
+// 6) Dépendances
+// -----------------------------------------
+dependencies {
+    // La version de RN est fixée par le RN Gradle Plugin
+    implementation("com.facebook.react:react-android")
+
+    // Récupération de flags pour GIF / WebP
+    def isGifEnabled = (findProperty('expo.gif.enabled') ?: "") == "true";
+    def isWebpEnabled = (findProperty('expo.webp.enabled') ?: "") == "true";
+    def isWebpAnimatedEnabled = (findProperty('expo.webp.animated') ?: "") == "true";
+
+    if (isGifEnabled) {
+        implementation("com.facebook.fresco:animated-gif:${reactAndroidLibs.versions.fresco.get()}")
+    }
+    if (isWebpEnabled) {
+        implementation("com.facebook.fresco:webpsupport:${reactAndroidLibs.versions.fresco.get()}")
+        if (isWebpAnimatedEnabled) {
+            implementation("com.facebook.fresco:animated-webp:${reactAndroidLibs.versions.fresco.get()}")
+        }
+    }
+
+    // Moteur JS : Hermes ou JSC
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-android")
+    } else {
+        def jscFlavor = 'org.webkit:android-jsc:+'
+        implementation jscFlavor
+    }
+
+    // Ajout de la bibliothèque standard Kotlin,
+    // en version rootProject.ext.kotlinVersion
+    implementation("org.jetbrains.kotlin:kotlin-stdlib:${rootProject.ext.kotlinVersion}")
+}

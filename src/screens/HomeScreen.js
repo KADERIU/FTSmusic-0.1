@@ -26,7 +26,7 @@ export default function HomeScreen({ navigation }) {
   const { setBottomBarHeight } = useMusicPlayer();
   useFocusEffect(
     React.useCallback(() => {
-      setBottomBarHeight(24); // Il y a un menu
+      setBottomBarHeight(49); // Il y a un menu
 
       return () => {
         // Optionnel : Remettre à une valeur par défaut si nécessaire

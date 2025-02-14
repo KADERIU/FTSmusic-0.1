@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<resources>
+
+    <!-- Couleur de fond pour l’écran de splash (déjà existante) -->
+    <color name="splashscreen_background">#FFFFFF</color>
+
+    <!-- Couleur d’arrière-plan utilisée par ic_launcher.xml et ic_launcher_round.xml -->
+    <color name="iconBackground">#FFFFFFFF</color>
+
+</resources>

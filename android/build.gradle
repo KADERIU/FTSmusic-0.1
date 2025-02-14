@@ -1,0 +1,56 @@
+buildscript {
+    ext {
+        buildToolsVersion  = "35.0.0"
+        minSdkVersion      = 24
+        compileSdkVersion  = 35
+        targetSdkVersion   = 34
+
+        // Version Kotlin exigée par le Compose Compiler ou vos besoins
+        kotlinVersion      = "1.9.24"
+
+        ndkVersion         = "26.1.10909125"
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath("com.android.tools.build:gradle:8.1.2")
+        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:${kotlinVersion}")
+        classpath("com.facebook.react:react-native-gradle-plugin")
+    }
+}
+
+apply plugin: "com.facebook.react.rootproject"
+
+allprojects {
+    repositories {
+        maven {
+            url(new File(['node', '--print', "require.resolve('react-native/package.json')"]
+                .execute(null, rootDir).text.trim(), '../android'))
+        }
+        maven {
+            url(new File(['node', '--print', "require.resolve('jsc-android/package.json', { paths: [require.resolve('react-native/package.json')] })"]
+                .execute(null, rootDir).text.trim(), '../dist'))
+        }
+        google()
+        mavenCentral()
+    }
+}
+
+// Forcer la version Kotlin à 1.9.24 pour toutes les dépendances
+subprojects {
+    configurations.all {
+        resolutionStrategy.eachDependency { details ->
+            if (details.requested.group == 'org.jetbrains.kotlin') {
+                details.useVersion "1.9.24"
+            }
+        }
+    }
+    // Forcer le même JVM target pour toutes les tâches Kotlin (ici "17")
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+        kotlinOptions {
+            jvmTarget = "17"
+        }
+    }
+}
